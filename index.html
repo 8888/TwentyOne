@@ -1,0 +1,113 @@
+<html>
+<head><title>Canvas Initial</title></head>
+<body bgcolor="#24AF69">
+	<canvas id="canvasElement" width="720" height="720" style="background-color: #F0F8FF;"></canvas>
+	<script type="text/javascript">
+		'use strict';
+		var canvas = document.getElementById("canvasElement");
+		canvas.tabIndex = 0;
+		canvas.focus();
+
+		var canvas_width = canvas.width;
+		var canvas_height = canvas.height;
+		var canvas_bounds = canvas.getBoundingClientRect();
+		var ctx = canvas.getContext("2d");
+
+        var mouseX = null,
+            mouseY = null,
+            toggle = false;
+
+		var deck = null;
+
+		function init() {
+			class Card {
+				constructor(rank, value, suit) {
+					this.rank = rank;
+					this.value = value;
+					this.suit = suit;
+				}
+			}
+
+			var card_ranks = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
+			var card_values = [2,3,4,5,6,7,8,9,10,10,10,10,11]; // Does not account for Ace low
+			var card_suits = ["Clubs", "Diamonds", "Hearts", "Spades"];
+
+			function make_deck(decks = 1) {
+				// Creates a usable deck of cards, comprised of a user chosen amount of standard 52 card decks
+				var new_deck = [];
+				for (var i = 0; i < decks; i++) { // Number of decks requested
+					for (var r = 0; r < card_ranks.length; r++) { // Each rank of cards
+						for (var s = 0; s < card_suits.length; s++) { // 1 card for each of the four suits
+							new_deck.push(new Card(card_ranks[r], card_values[r], card_suits[s]));
+						}
+					}
+				}
+				return new_deck;
+			}
+
+			function rng(min, max) {
+				// Returns a random integer between min(inclusive) and max(exclusive)
+				return Math.floor(Math.random() * (max - min)) + min;
+			}
+
+			function shuffle(unshuffled_deck, iterations = 10) {
+				// Takes an array of Card objects and returns it in a random order
+				var unshuffled_deck = unshuffled_deck;
+				var shuffled_deck = [];
+				for (var i = 0; i < iterations; i++) {
+					for (var c = 0; c < unshuffled_deck.length;) {
+						var index = rng(0, unshuffled_deck.length);
+						var card = unshuffled_deck.splice(index, 1);
+						shuffled_deck.push(card[0]);
+					}
+				}
+				return shuffled_deck;
+			}
+
+			deck = make_deck();
+			console.log(deck);
+			deck = shuffle(deck);
+			console.log(deck);
+		}
+
+		//Handle User Input
+		canvas.addEventListener("mousedown", function(event) {
+			toggle = !toggle;
+		});
+		canvas.addEventListener("mousemove", function(event) {
+			mouseX = event.clientX - canvas_bounds.left;
+			mouseY = event.clientY - canvas_bounds.top;
+		});
+
+		var gameDelta = null,
+            frameCount = 0;
+		function update(delta) {
+			gameDelta = delta;
+            frameCount++;
+		}
+
+		function display() {
+			ctx.clearRect(0, 0, canvas_width, canvas_height);
+            ctx.font = "14px Courier New";
+            ctx.strokeStyle = "black";
+            let text = gameDelta.toFixed(2).toString() + "ms @ " + (1000/gameDelta).toFixed(2).toString() + "fps";
+            if (toggle) {
+                text = frameCount.toString() + " total frames";
+            }
+
+            ctx.strokeText(text, mouseX + 25, mouseY);
+		}
+
+		window.onload = function() {
+			init();
+			var mainloop_updateLast = performance.now();
+			(function mainLoop(nowTime) {
+				update(nowTime - mainloop_updateLast);
+				display();
+				mainloop_updateLast = nowTime;
+				requestAnimationFrame(mainLoop);
+			})(performance.now());
+		}
+	</script>
+</body>
+</html>
