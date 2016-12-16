@@ -22,6 +22,7 @@
 		var human_player = null;
 		var dealer_player = null;
 
+		// Game initialization
 		function init() {
 			class Card {
 				constructor(rank, value, suit) {
@@ -34,10 +35,11 @@
 			class Player {
 				constructor() {
 					this.hand = [];
+					this.hand_total = 0;
 				}
 
-				receive_card() {
-					
+				receive_card(card) {
+					this.hand.push(card);
 				}
 			}
 
@@ -64,6 +66,12 @@
 							}
 						}
 						return shuffled_deck;
+					}
+
+					dealer.deal = function(deck, player) {
+						// Deals the last card in the deck array to the player
+						let card = deck.pop();
+						player.receive_card(card);
 					}
 
 					return dealer;
@@ -95,14 +103,17 @@
 				return new_deck;
 			}
 
-			
-
 			dealer = card_dealer_singleton.getInstance();
 			human_player = new Player();
 			dealer_player = new Player();
 			deck = make_deck();
 			deck = dealer.shuffle(deck);
+			dealer.deal(deck, human_player);
+			dealer.deal(deck, dealer_player);
+
 			console.log(deck);
+			console.log(human_player.hand);
+			console.log(dealer_player.hand);
 		}
 
 		//Handle User Input
