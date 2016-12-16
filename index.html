@@ -18,9 +18,11 @@
             toggle = false;
 
 		var deck = null;
-		var dealer = null;
+		var muck = []; // Discard pile
+		var dealer = null; // Object that handles object interactions
 		var human_player = null;
 		var dealer_player = null;
+		var players = []; // Array of all players in the game
 
 		// Game initialization
 		function init() {
@@ -39,7 +41,13 @@
 				}
 
 				receive_card(card) {
+					// add a card to the hand
 					this.hand.push(card);
+				}
+
+				muck_hand() {
+					// remove all cards from the hand
+					return this.hand.splice(0, this.hand.length);
 				}
 			}
 
@@ -74,6 +82,25 @@
 						player.receive_card(card);
 					}
 
+					dealer.muck_hands = function(player) {
+						// Moves all of the cards from the player's hands to the muck pile
+						var mucked_hand = player.muck_hand();
+							for (var c = 0; c < mucked_hand.length;) {
+								let card = mucked_hand.pop()
+								muck.push(card);
+							}
+
+					}
+
+					dealer.new_hand = function(players) {
+						// Starts a new hand
+						for (var c = 0; c < 2; c++){ // 2 cards total per player
+							for (var p = 0; p < players.length; p++) { // alternates to each player
+								dealer.deal(deck, players[p]);
+							}
+						}
+					}
+
 					return dealer;
 				}
 				return {
@@ -87,7 +114,7 @@
 			})();
 
 			var card_ranks = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
-			var card_values = [2,3,4,5,6,7,8,9,10,10,10,10,11]; // Does not account for Ace low
+			var card_values = [2,3,4,5,6,7,8,9,10,10,10,10,11]; // TODO: Does not account for Ace low
 			var card_suits = ["Clubs", "Diamonds", "Hearts", "Spades"];
 
 			function make_deck(decks = 1) {
@@ -106,20 +133,34 @@
 			dealer = card_dealer_singleton.getInstance();
 			human_player = new Player();
 			dealer_player = new Player();
+			players.push(human_player, dealer_player);
 			deck = make_deck();
 			deck = dealer.shuffle(deck);
-			dealer.deal(deck, human_player);
-			dealer.deal(deck, dealer_player);
-
-			console.log(deck);
-			console.log(human_player.hand);
-			console.log(dealer_player.hand);
 		}
 
 		//Handle User Input
 		canvas.addEventListener("mousedown", function(event) {
 			toggle = !toggle;
+
+			// Click deal button
+			mouseX = event.clientX - canvas_bounds.left;
+			mouseY = event.clientY - canvas_bounds.top;
+			if (mouseX > canvas_bounds.left+50 && mouseX < canvas_bounds.left+50+100) { // the buttons being clicked should have callable sizes, not hard coded all over the place. Variable? Object?
+				if (mouseY > canvas_bounds.bottom-100 && mouseY < canvas_bounds.bottom-100+50) {
+					for (var p = 0; p < players.length; p ++) { 
+						if (players[p].hand) { // If the player has cards, discard them before dealing a new hand
+							dealer.muck_hands(players[p]);
+						}
+					}
+					dealer.new_hand(players);
+
+					console.log(deck);
+					console.log(human_player.hand);
+					console.log(dealer_player.hand);
+				}
+			}
 		});
+
 		canvas.addEventListener("mousemove", function(event) {
 			mouseX = event.clientX - canvas_bounds.left;
 			mouseY = event.clientY - canvas_bounds.top;
@@ -142,6 +183,31 @@
             }
 
             ctx.strokeText(text, mouseX + 25, mouseY);
+
+
+			// Draw initial basic interface
+			// ****This will change as the game expands****
+
+			// Deal Button
+			ctx.rect(canvas_bounds.left+50, canvas_bounds.bottom-100,100,50);
+			ctx.font = "20px Courier New";
+            ctx.strokeStyle = "black";
+			ctx.fillText("Deal", canvas_bounds.left+75, canvas_bounds.bottom-75);
+			ctx.stroke();
+
+
+			function display_hand(player, x, y) {
+				// Display the hand of a given player at x,y location
+				var hand = "";
+				for (var c = 0; c < player.hand.length; c++) {
+					hand += player.hand[c].rank;
+					hand += " ";
+				}
+				ctx.fillText("Hand: " + hand, canvas_bounds.left + x, canvas_bounds.bottom - y);
+			}
+
+			display_hand(human_player, 200, 75); // player could have a display hand method, if this approach remains
+			display_hand(dealer_player, 200, 700);
 		}
 
 		window.onload = function() {
