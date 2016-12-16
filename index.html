@@ -18,6 +18,9 @@
             toggle = false;
 
 		var deck = null;
+		var dealer = null;
+		var human_player = null;
+		var dealer_player = null;
 
 		function init() {
 			class Card {
@@ -27,6 +30,53 @@
 					this.suit = suit;
 				}
 			}
+
+			class Player {
+				constructor() {
+					this.hand = [];
+				}
+
+				receive_card() {
+					
+				}
+			}
+
+			var card_dealer_singleton = (function() {
+				// Creates one and only one instance of the card dealer object
+				var instance;
+				function createInstance() {
+					let dealer = new Object();
+					// Dealer functions			
+					dealer.rng = function(min, max) {
+						// Returns a random integer between min(inclusive) and max(exclusive)
+						return Math.floor(Math.random() * (max - min)) + min;
+					}
+
+					dealer.shuffle = function(unshuffled_deck, iterations = 10) {
+						// Takes an array of Card objects and returns it in a random order
+						var unshuffled_deck = unshuffled_deck;
+						var shuffled_deck = [];
+						for (var i = 0; i < iterations; i++) {
+							for (var c = 0; c < unshuffled_deck.length;) {
+								var index = dealer.rng(0, unshuffled_deck.length);
+								var card = unshuffled_deck.splice(index, 1);
+								shuffled_deck.push(card[0]);
+							}
+						}
+						return shuffled_deck;
+					}
+
+					return dealer;
+				}
+				return {
+					getInstance: function() {
+						if (!instance) {
+							instance = createInstance();
+						}
+						return instance;
+					}
+ 				}
+			})();
 
 			var card_ranks = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
 			var card_values = [2,3,4,5,6,7,8,9,10,10,10,10,11]; // Does not account for Ace low
@@ -45,28 +95,13 @@
 				return new_deck;
 			}
 
-			function rng(min, max) {
-				// Returns a random integer between min(inclusive) and max(exclusive)
-				return Math.floor(Math.random() * (max - min)) + min;
-			}
+			
 
-			function shuffle(unshuffled_deck, iterations = 10) {
-				// Takes an array of Card objects and returns it in a random order
-				var unshuffled_deck = unshuffled_deck;
-				var shuffled_deck = [];
-				for (var i = 0; i < iterations; i++) {
-					for (var c = 0; c < unshuffled_deck.length;) {
-						var index = rng(0, unshuffled_deck.length);
-						var card = unshuffled_deck.splice(index, 1);
-						shuffled_deck.push(card[0]);
-					}
-				}
-				return shuffled_deck;
-			}
-
+			dealer = card_dealer_singleton.getInstance();
+			human_player = new Player();
+			dealer_player = new Player();
 			deck = make_deck();
-			console.log(deck);
-			deck = shuffle(deck);
+			deck = dealer.shuffle(deck);
 			console.log(deck);
 		}
 
