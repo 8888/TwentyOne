@@ -17,6 +17,8 @@
             mouseY = null,
             toggle = false;
 
+		var game_state = 0; // current game state
+		var State = null; // object with different possible game states
 		var deck = null;
 		var muck = []; // Discard pile
 		var dealer = null; // Object that handles object interactions
@@ -26,6 +28,15 @@
 
 		// Game initialization
 		function init() {
+			class GameState {
+				// State of the game
+				constructor() {
+					this.new_game = 0b00000001;
+					this.playing_hand = 0b00000010;
+					this.hand_complete = 0b00000100;
+				}
+			}
+
 			class Card {
 				constructor(rank, value, suit) {
 					this.rank = rank;
@@ -43,6 +54,7 @@
 				receive_card(card) {
 					// add a card to the hand
 					this.hand.push(card);
+					this.calculate_total();
 				}
 
 				muck_hand() {
@@ -101,7 +113,6 @@
 								let card = mucked_hand.pop()
 								muck.push(card);
 							}
-
 					}
 
 					dealer.new_hand = function(players) {
@@ -112,7 +123,6 @@
 							}
 						}
 					}
-
 					return dealer;
 				}
 				return {
@@ -142,6 +152,8 @@
 				return new_deck;
 			}
 
+			State = new GameState();
+			game_state = State.new_game;
 			dealer = card_dealer_singleton.getInstance();
 			human_player = new Player();
 			dealer_player = new Player();
@@ -165,10 +177,6 @@
 						}
 					}
 					dealer.new_hand(players);
-
-					console.log(deck);
-					console.log(human_player.hand);
-					console.log(dealer_player.hand);
 				}
 			}
 		});
@@ -178,13 +186,24 @@
 			mouseY = event.clientY - canvas_bounds.top;
 		});
 
+		// Update
 		var gameDelta = null,
             frameCount = 0;
 		function update(delta) {
 			gameDelta = delta;
             frameCount++;
+
+			// New game
+			if (game_state === State.new_game) {
+				dealer.new_hand(players);
+				game_state = State.playing_hand;
+			}
+			// Playing hand
+			if (game_state === State.playing_hand) {
+			}
 		}
 
+		// Draw the elements to the canvas
 		function display() {
 			ctx.clearRect(0, 0, canvas_width, canvas_height);
             ctx.font = "14px Courier New";
@@ -234,15 +253,17 @@
 			function display_hand(player, x, y) {
 				// Display the hand of a given player at x,y location
 				var hand = "";
+				var total = player.hand_total;
 				for (var c = 0; c < player.hand.length; c++) {
 					hand += player.hand[c].rank;
 					hand += " ";
 				}
 				ctx.fillText("Hand: " + hand, canvas_bounds.left + x, canvas_bounds.bottom - y);
+				ctx.fillText("Total: " + total, canvas_bounds.left + x, canvas_bounds.bottom - y + 25);
 			}
 
-			display_hand(human_player, 200, 75); // player could have a display hand method, if this approach remains
-			display_hand(dealer_player, 200, 700);
+			display_hand(human_player, 250, 75); // player could have a display hand method, if this approach remains
+			display_hand(dealer_player, 250, 700);
 		}
 
 		window.onload = function() {
