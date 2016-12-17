@@ -81,7 +81,9 @@
 						// Game parameters
 						state: 0, // current game state
 						deck: null,
-						muck: [] // discard pile
+						muck: [], // discard pile
+						deckMin: 17, // minimum deck array length before reshuffling TODO: randomize this with each new shuffle
+						message: ""
 					}
 
 					// Game functions
@@ -130,7 +132,7 @@
 						// Moves all of the cards from the player's hands to the muck pile
 						var mucked_hand = player.muck_hand();
 							for (var c = 0; c < mucked_hand.length;) {
-								let card = mucked_hand.pop()
+								let card = mucked_hand.pop();
 								this.muck.push(card);
 							}
 					}
@@ -142,6 +144,15 @@
 								this.deal(players[p]);
 							}
 						}
+					}
+
+					game.deck_reshuffle = function() {
+						// Reshuffles the cards from the muck and the deck into a new deck
+						for (var c = 0; c < this.muck.length;) {
+							let card = this.muck.pop();
+							this.deck.push(card);
+						}
+						this.deck = this.shuffle(this.deck);
 					}
 					return game;
 				}
@@ -223,24 +234,25 @@
 			}
 			// Playing hand
 			if (Game.state === State.playing_hand) {
+				Game.message = "Your move...";
 				// Check for blackjack
 				if (human_player.hand.length === 2 && dealer_player.hand.length === 2) {
 					if (human_player.hand_total === 21) {
 						if (dealer_player.hand_total === 21) {
-							console.log("push");
+							Game.message = "Push";
 							Game.state = State.hand_complete;
 						} else {
-							console.log("You got a blackjack!");
+							Game.message = "You got a blackjack!";
 							Game.state = State.hand_complete;
 						}
 					} else if (dealer_player.hand_total === 21) {
-						console.log("The dealer got a blackjack!");
+						Game.message = "The dealer got a blackjack!";
 						Game.state = State.hand_complete;
 					}
 				}
 				// Check for bust
 				if (human_player.hand_total > 21) {
-					console.log("You busted!");
+					Game.message = "You busted!";
 					Game.state = State.hand_complete;
 				}
 			}
@@ -248,12 +260,18 @@
 			if (Game.state === State.dealer_playing) {
 				// Check for bust
 				if (dealer_player.hand_total > 21) {
-					console.log("The dealer busted!");
+					Game.message = "The dealer busted!";
 					Game.state = State.hand_complete;
 				} else if (dealer_player.hand_total < 17) {
 					Game.deal(dealer_player);
 				} else {
-					console.log("Check for winner");
+					if (human_player.hand_total > dealer_player.hand_total) {
+						Game.message = "You win!";
+					} else if (dealer_player.hand_total > human_player.hand_total) {
+						Game.message = "You lose!";
+					} else {
+						Game.message = "push";
+					}
 					Game.state = State.hand_complete;
 				}
 			}
@@ -262,6 +280,10 @@
 			// Hand complete
 			if (Game.state === State.hand_complete) {
 				// pay winnings, prepare for next hand, etc.
+				if (Game.deck.length < Game.deckMin) {
+					Game.deck_reshuffle();
+					Game.message += " Deck shuffled!";
+				}
 			}
 		}
 
@@ -336,6 +358,12 @@
 
 			display_hand(human_player, 300, 75); // player could have a display hand method, if this approach remains
 			display_hand(dealer_player, 300, 700);
+
+			// Display message
+			ctx.font = "22px Courier New";
+            ctx.strokeStyle = "black";
+			ctx.fillText(Game.message, canvas_bounds.left+250, canvas_bounds.bottom-500);
+			ctx.stroke();
 		}
 
 		window.onload = function() {
