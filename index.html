@@ -30,7 +30,8 @@
 				constructor() {
 					this.new_game = 0b00000001;
 					this.playing_hand = 0b00000010;
-					this.hand_complete = 0b00000100;
+					this.dealer_playing = 0b00000100;
+					this.hand_complete = 0b00001000;
 				}
 			}
 
@@ -87,7 +88,7 @@
 					game.make_deck = function(decks = 1) {
 						// Creates a usable deck of cards, comprised of a user chosen amount of standard 52 card decks
 						var card_ranks = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
-						var card_values = [2,3,4,5,6,7,8,9,10,10,10,10,11]; // TODO: Does not account for Ace low
+						var card_values = [2,3,4,5,6,7,8,9,10,10,10,10,11]; // TODO: Does not account for Ace low and allows a hand total of 22
 						var card_suits = ["Clubs", "Diamonds", "Hearts", "Spades"];
 						var new_deck = [];
 						for (var i = 0; i < decks; i++) { // Number of decks requested
@@ -119,9 +120,9 @@
 						return shuffled_deck;
 					}
 
-					game.deal = function(deck, player) {
+					game.deal = function(player) {
 						// Deals the last card in the deck array to the player
-						let card = deck.pop();
+						let card = this.deck.pop();
 						player.receive_card(card);
 					}
 
@@ -138,7 +139,7 @@
 						// Starts a new hand
 						for (var c = 0; c < 2; c++){ // 2 cards total per player
 							for (var p = 0; p < players.length; p++) { // alternates to each player
-								this.deal(this.deck, players[p]);
+								this.deal(players[p]);
 							}
 						}
 					}
@@ -168,17 +169,37 @@
 		canvas.addEventListener("mousedown", function(event) {
 			toggle = !toggle;
 
-			// Click deal button
 			mouseX = event.clientX - canvas_bounds.left;
 			mouseY = event.clientY - canvas_bounds.top;
-			if (mouseX > canvas_bounds.left+50 && mouseX < canvas_bounds.left+50+100) { // the buttons being clicked should have callable sizes, not hard coded all over the place. Variable? Object?
-				if (mouseY > canvas_bounds.bottom-100 && mouseY < canvas_bounds.bottom-100+50) {
-					for (var p = 0; p < players.length; p ++) { 
-						if (players[p].hand) { // If the player has cards, discard them before dealing a new hand
-							Game.muck_hands(players[p]);
+
+			// Click deal button
+			if (Game.state === State.hand_complete) {
+				if (mouseX > canvas_bounds.left+50 && mouseX < canvas_bounds.left+50+100) { // the buttons being clicked should have callable sizes, not hard coded all over the place. Variable? Object?
+					if (mouseY > canvas_bounds.bottom-100 && mouseY < canvas_bounds.bottom-100+50) {
+						for (var p = 0; p < players.length; p ++) { 
+							if (players[p].hand) { // If the player has cards, discard them before dealing a new hand
+								Game.muck_hands(players[p]);
+							}
 						}
+						Game.new_hand(players);
+						Game.state = State.playing_hand;
 					}
-					Game.new_hand(players);
+				}
+			}
+
+			// Click Hit or Stand buttons
+			if (Game.state === State.playing_hand) {
+				// Hit
+				if (mouseX > canvas_bounds.left+550 && mouseX < canvas_bounds.left+550+100) {
+					if (mouseY > canvas_bounds.bottom-175 && mouseY < canvas_bounds.bottom-175+50) {
+						Game.deal(human_player);
+					}
+				}
+				// Stand
+				if (mouseX > canvas_bounds.left+550 && mouseX < canvas_bounds.left+550+100) {
+					if (mouseY > canvas_bounds.bottom-100 && mouseY < canvas_bounds.bottom-100+50) {
+						Game.state = State.dealer_playing;
+					}
 				}
 			}
 		});
@@ -202,6 +223,45 @@
 			}
 			// Playing hand
 			if (Game.state === State.playing_hand) {
+				// Check for blackjack
+				if (human_player.hand.length === 2 && dealer_player.hand.length === 2) {
+					if (human_player.hand_total === 21) {
+						if (dealer_player.hand_total === 21) {
+							console.log("push");
+							Game.state = State.hand_complete;
+						} else {
+							console.log("You got a blackjack!");
+							Game.state = State.hand_complete;
+						}
+					} else if (dealer_player.hand_total === 21) {
+						console.log("The dealer got a blackjack!");
+						Game.state = State.hand_complete;
+					}
+				}
+				// Check for bust
+				if (human_player.hand_total > 21) {
+					console.log("You busted!");
+					Game.state = State.hand_complete;
+				}
+			}
+			// Dealer playing hand
+			if (Game.state === State.dealer_playing) {
+				// Check for bust
+				if (dealer_player.hand_total > 21) {
+					console.log("The dealer busted!");
+					Game.state = State.hand_complete;
+				} else if (dealer_player.hand_total < 17) {
+					Game.deal(dealer_player);
+				} else {
+					console.log("Check for winner");
+					Game.state = State.hand_complete;
+				}
+			}
+
+
+			// Hand complete
+			if (Game.state === State.hand_complete) {
+				// pay winnings, prepare for next hand, etc.
 			}
 		}
 
@@ -251,6 +311,16 @@
 			ctx.fillText("Deal", canvas_bounds.left+75, canvas_bounds.bottom-75);
 			ctx.stroke();
 
+			// Hit Button
+			ctx.rect(canvas_bounds.left+550, canvas_bounds.bottom-175,100,50);
+			ctx.fillText("Hit", canvas_bounds.left+575, canvas_bounds.bottom-150);
+			ctx.stroke();
+			
+			// Stand Button
+			ctx.rect(canvas_bounds.left+550, canvas_bounds.bottom-100,100,50);
+			ctx.fillText("Stand", canvas_bounds.left+575, canvas_bounds.bottom-75);
+			ctx.stroke();
+
 
 			function display_hand(player, x, y) {
 				// Display the hand of a given player at x,y location
@@ -264,8 +334,8 @@
 				ctx.fillText("Total: " + total, canvas_bounds.left + x, canvas_bounds.bottom - y + 25);
 			}
 
-			display_hand(human_player, 250, 75); // player could have a display hand method, if this approach remains
-			display_hand(dealer_player, 250, 700);
+			display_hand(human_player, 300, 75); // player could have a display hand method, if this approach remains
+			display_hand(dealer_player, 300, 700);
 		}
 
 		window.onload = function() {
