@@ -1,5 +1,5 @@
 <html>
-<head><title>Canvas Initial</title></head>
+<head><title>Twenty One</title></head>
 <body bgcolor="#24AF69">
 	<canvas id="canvasElement" width="720" height="720" style="background-color: #F0F8FF;"></canvas>
 	<script type="text/javascript">
@@ -17,11 +17,8 @@
             mouseY = null,
             toggle = false;
 
-		var game_state = 0; // current game state
 		var State = null; // object with different possible game states
-		var deck = null;
-		var muck = []; // Discard pile
-		var dealer = null; // Object that handles object interactions
+		var Game = null; // Object that handles object interactions
 		var human_player = null;
 		var dealer_player = null;
 		var players = []; // Array of all players in the game
@@ -75,24 +72,46 @@
 				}
 			}
 
-			var card_dealer_singleton = (function() {
-				// Creates one and only one instance of the card dealer object
+			var game_singleton = (function() {
+				// Creates one and only one instance of the game logic object
 				var instance;
 				function createInstance() {
-					let dealer = new Object();
-					// Dealer functions			
-					dealer.rng = function(min, max) {
+					let game = {
+						// Game parameters
+						state: 0, // current game state
+						deck: null,
+						muck: [] // discard pile
+					}
+
+					// Game functions
+					game.make_deck = function(decks = 1) {
+						// Creates a usable deck of cards, comprised of a user chosen amount of standard 52 card decks
+						var card_ranks = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
+						var card_values = [2,3,4,5,6,7,8,9,10,10,10,10,11]; // TODO: Does not account for Ace low
+						var card_suits = ["Clubs", "Diamonds", "Hearts", "Spades"];
+						var new_deck = [];
+						for (var i = 0; i < decks; i++) { // Number of decks requested
+							for (var r = 0; r < card_ranks.length; r++) { // Each rank of cards
+								for (var s = 0; s < card_suits.length; s++) { // 1 card for each of the four suits
+									new_deck.push(new Card(card_ranks[r], card_values[r], card_suits[s]));
+								}
+							}
+						}
+						return new_deck;
+					}
+
+					game.rng = function(min, max) {
 						// Returns a random integer between min(inclusive) and max(exclusive)
 						return Math.floor(Math.random() * (max - min)) + min;
 					}
 
-					dealer.shuffle = function(unshuffled_deck, iterations = 10) {
+					game.shuffle = function(unshuffled_deck, iterations = 10) {
 						// Takes an array of Card objects and returns it in a random order
 						var unshuffled_deck = unshuffled_deck;
 						var shuffled_deck = [];
 						for (var i = 0; i < iterations; i++) {
 							for (var c = 0; c < unshuffled_deck.length;) {
-								var index = dealer.rng(0, unshuffled_deck.length);
+								var index = this.rng(0, unshuffled_deck.length);
 								var card = unshuffled_deck.splice(index, 1);
 								shuffled_deck.push(card[0]);
 							}
@@ -100,30 +119,30 @@
 						return shuffled_deck;
 					}
 
-					dealer.deal = function(deck, player) {
+					game.deal = function(deck, player) {
 						// Deals the last card in the deck array to the player
 						let card = deck.pop();
 						player.receive_card(card);
 					}
 
-					dealer.muck_hands = function(player) {
+					game.muck_hands = function(player) {
 						// Moves all of the cards from the player's hands to the muck pile
 						var mucked_hand = player.muck_hand();
 							for (var c = 0; c < mucked_hand.length;) {
 								let card = mucked_hand.pop()
-								muck.push(card);
+								this.muck.push(card);
 							}
 					}
 
-					dealer.new_hand = function(players) {
+					game.new_hand = function(players) {
 						// Starts a new hand
 						for (var c = 0; c < 2; c++){ // 2 cards total per player
 							for (var p = 0; p < players.length; p++) { // alternates to each player
-								dealer.deal(deck, players[p]);
+								this.deal(this.deck, players[p]);
 							}
 						}
 					}
-					return dealer;
+					return game;
 				}
 				return {
 					getInstance: function() {
@@ -134,32 +153,15 @@
 					}
  				}
 			})();
-
-			var card_ranks = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
-			var card_values = [2,3,4,5,6,7,8,9,10,10,10,10,11]; // TODO: Does not account for Ace low
-			var card_suits = ["Clubs", "Diamonds", "Hearts", "Spades"];
-
-			function make_deck(decks = 1) {
-				// Creates a usable deck of cards, comprised of a user chosen amount of standard 52 card decks
-				var new_deck = [];
-				for (var i = 0; i < decks; i++) { // Number of decks requested
-					for (var r = 0; r < card_ranks.length; r++) { // Each rank of cards
-						for (var s = 0; s < card_suits.length; s++) { // 1 card for each of the four suits
-							new_deck.push(new Card(card_ranks[r], card_values[r], card_suits[s]));
-						}
-					}
-				}
-				return new_deck;
-			}
-
+			
 			State = new GameState();
-			game_state = State.new_game;
-			dealer = card_dealer_singleton.getInstance();
+			Game = game_singleton.getInstance();
+			Game.state = State.new_game;
 			human_player = new Player();
 			dealer_player = new Player();
 			players.push(human_player, dealer_player);
-			deck = make_deck();
-			deck = dealer.shuffle(deck);
+			Game.deck = Game.make_deck();
+			Game.deck = Game.shuffle(Game.deck);
 		}
 
 		//Handle User Input
@@ -173,10 +175,10 @@
 				if (mouseY > canvas_bounds.bottom-100 && mouseY < canvas_bounds.bottom-100+50) {
 					for (var p = 0; p < players.length; p ++) { 
 						if (players[p].hand) { // If the player has cards, discard them before dealing a new hand
-							dealer.muck_hands(players[p]);
+							Game.muck_hands(players[p]);
 						}
 					}
-					dealer.new_hand(players);
+					Game.new_hand(players);
 				}
 			}
 		});
@@ -194,12 +196,12 @@
             frameCount++;
 
 			// New game
-			if (game_state === State.new_game) {
-				dealer.new_hand(players);
-				game_state = State.playing_hand;
+			if (Game.state === State.new_game) {
+				Game.new_hand(players);
+				Game.state = State.playing_hand;
 			}
 			// Playing hand
-			if (game_state === State.playing_hand) {
+			if (Game.state === State.playing_hand) {
 			}
 		}
 
