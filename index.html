@@ -44,9 +44,10 @@
 			}
 
 			class Player {
-				constructor() {
+				constructor(is_dealer) {
 					this.hand = [];
 					this.hand_total = 0;
+					this.is_dealer = is_dealer;
 				}
 
 				receive_card(card) {
@@ -169,8 +170,8 @@
 			State = new GameState();
 			Game = game_singleton.getInstance();
 			Game.state = State.new_game;
-			human_player = new Player();
-			dealer_player = new Player();
+			human_player = new Player(false);
+			dealer_player = new Player(true);
 			players.push(human_player, dealer_player);
 			Game.deck = Game.make_deck();
 			Game.deck = Game.shuffle(Game.deck);
@@ -348,12 +349,20 @@
 				// Display the hand of a given player at x,y location
 				var hand = "";
 				var total = player.hand_total;
-				for (var c = 0; c < player.hand.length; c++) {
+				if (player.is_dealer && Game.state === State.playing_hand) {
+					var c = 1;
+					hand += "? "
+				} else {
+					var c = 0;
+				}
+				for (c; c < player.hand.length; c++) {
 					hand += player.hand[c].rank;
 					hand += " ";
 				}
 				ctx.fillText("Hand: " + hand, canvas_bounds.left + x, canvas_bounds.bottom - y);
-				ctx.fillText("Total: " + total, canvas_bounds.left + x, canvas_bounds.bottom - y + 25);
+				if (!player.is_dealer || Game.state !== State.playing_hand) {
+					ctx.fillText("Total: " + total, canvas_bounds.left + x, canvas_bounds.bottom - y + 25);
+				}
 			}
 
 			display_hand(human_player, 300, 75); // player could have a display hand method, if this approach remains
