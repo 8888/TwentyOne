@@ -14,8 +14,7 @@
 		var ctx = canvas.getContext("2d");
 
         var mouseX = null,
-            mouseY = null,
-            toggle = false;
+            mouseY = null;
 
 		var State = null; // object with different possible game states
 		var Game = null; // Object that handles object interactions
@@ -65,9 +64,24 @@
 				calculate_total() {
 					// calculates the total hand value
 					var total = 0;
+					var ace_seen = [];
 					if (this.hand.length > 0) {
 						for (var c = 0; c < this.hand.length; c++) {
-							total += this.hand[c].value;
+							if (this.hand[c].rank === "A") {
+								total += this.hand[c].value[1]; // high
+								ace_seen.push(10);
+							} else {
+								total += this.hand[c].value;
+							}
+						}
+						if (total > 21 && ace_seen.length > 0) {
+							for (var a = 0; a < ace_seen.length; a++) {
+								total -= ace_seen[a];
+								if (total <= 21) {
+									a = ace_seen.length;
+								}
+							}
+
 						}
 					}
 					this.hand_total = total;
@@ -91,7 +105,7 @@
 					game.make_deck = function(decks = 1) {
 						// Creates a usable deck of cards, comprised of a user chosen amount of standard 52 card decks
 						var card_ranks = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
-						var card_values = [2,3,4,5,6,7,8,9,10,10,10,10,11]; // TODO: Does not account for Ace low and allows a hand total of 22
+						var card_values = [2,3,4,5,6,7,8,9,10,10,10,10,[1,11]];
 						var card_suits = ["Clubs", "Diamonds", "Hearts", "Spades"];
 						var new_deck = [];
 						for (var i = 0; i < decks; i++) { // Number of decks requested
@@ -179,8 +193,6 @@
 
 		//Handle User Input
 		canvas.addEventListener("mousedown", function(event) {
-			toggle = !toggle;
-
 			mouseX = event.clientX - canvas_bounds.left;
 			mouseY = event.clientY - canvas_bounds.top;
 
@@ -293,13 +305,6 @@
 			ctx.clearRect(0, 0, canvas_width, canvas_height);
             ctx.font = "14px Courier New";
             ctx.strokeStyle = "black";
-            let text = gameDelta.toFixed(2).toString() + "ms @ " + (1000/gameDelta).toFixed(2).toString() + "fps";
-            if (toggle) {
-                text = frameCount.toString() + " total frames";
-            }
-
-            ctx.strokeText(text, mouseX + 25, mouseY);
-
 
 			// Draw initial basic interface
 			// ****This will change as the game expands****
