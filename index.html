@@ -31,6 +31,7 @@
 					this.playing_hand = 0b00000010;
 					this.dealer_playing = 0b00000100;
 					this.hand_complete = 0b00001000;
+					this.game_over = 0b00010000;
 				}
 			}
 
@@ -47,6 +48,10 @@
 					this.hand = [];
 					this.hand_total = 0;
 					this.is_dealer = is_dealer;
+					if (!is_dealer) {
+						this.bet = 0;
+						this.chip_stack = 0;
+					}
 				}
 
 				receive_card(card) {
@@ -102,6 +107,22 @@
 					}
 
 					// Game functions
+					game.new_game = function() {
+						// Start a new game
+						this.state = State.new_game;
+						human_player = new Player(false);
+						dealer_player = new Player(true);
+						players.push(human_player, dealer_player);
+						this.deck = this.make_deck();
+						this.deck = this.shuffle(this.deck);
+						for (var p = 0; p < players.length; p++) {
+							if (!players[p].is_dealer) {
+								players[p].bet = 10;
+								players[p].chip_stack = 200;
+							}
+						}
+					}
+
 					game.make_deck = function(decks = 1) {
 						// Creates a usable deck of cards, comprised of a user chosen amount of standard 52 card decks
 						var card_ranks = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
@@ -183,12 +204,7 @@
 			
 			State = new GameState();
 			Game = game_singleton.getInstance();
-			Game.state = State.new_game;
-			human_player = new Player(false);
-			dealer_player = new Player(true);
-			players.push(human_player, dealer_player);
-			Game.deck = Game.make_deck();
-			Game.deck = Game.shuffle(Game.deck);
+			Game.new_game();
 		}
 
 		//Handle User Input
@@ -226,6 +242,26 @@
 					}
 				}
 			}
+
+			// Click bet buttons
+			if (Game.state === State.hand_complete) {
+				// Bet minus
+				if (mouseX > canvas_bounds.left+50 && mouseX < canvas_bounds.left+50+20) {
+					if (mouseY > canvas_bounds.bottom-160 && mouseY < canvas_bounds.bottom-100+20) {
+						if (human_player.bet - 5 > 0) {
+							human_player.bet -= 5;
+						}
+					}
+				}
+				// Bet plus
+				if (mouseX > canvas_bounds.left+50+75 && mouseX < canvas_bounds.left+50+75+20) {
+					if (mouseY > canvas_bounds.bottom-160 && mouseY < canvas_bounds.bottom-100+20) {
+						if (human_player.bet + 5 <= human_player.chip_stack) {
+							human_player.bet += 5;
+						}
+					}
+				}
+			}
 		});
 
 		canvas.addEventListener("mousemove", function(event) {
@@ -242,8 +278,8 @@
 
 			// New game
 			if (Game.state === State.new_game) {
-				Game.new_hand(players);
-				Game.state = State.playing_hand;
+				Game.message = "Place your bets!";
+				Game.state = State.hand_complete;
 			}
 			// Playing hand
 			if (Game.state === State.playing_hand) {
@@ -256,16 +292,19 @@
 							Game.state = State.hand_complete;
 						} else {
 							Game.message = "You got a blackjack!";
+							human_player.chip_stack += (human_player.bet / 2) * 3;
 							Game.state = State.hand_complete;
 						}
 					} else if (dealer_player.hand_total === 21) {
 						Game.message = "The dealer got a blackjack!";
+						human_player.chip_stack -= human_player.bet;
 						Game.state = State.hand_complete;
 					}
 				}
 				// Check for bust
 				if (human_player.hand_total > 21) {
 					Game.message = "You busted!";
+					human_player.chip_stack -= human_player.bet;
 					Game.state = State.hand_complete;
 				}
 			}
@@ -274,14 +313,17 @@
 				// Check for bust
 				if (dealer_player.hand_total > 21) {
 					Game.message = "The dealer busted!";
+					human_player.chip_stack += human_player.bet;
 					Game.state = State.hand_complete;
 				} else if (dealer_player.hand_total < 17) {
 					Game.deal(dealer_player);
 				} else {
 					if (human_player.hand_total > dealer_player.hand_total) {
 						Game.message = "You win!";
+						human_player.chip_stack += human_player.bet;
 					} else if (dealer_player.hand_total > human_player.hand_total) {
 						Game.message = "You lose!";
+						human_player.chip_stack -= human_player.bet;
 					} else {
 						Game.message = "push";
 					}
@@ -292,10 +334,23 @@
 
 			// Hand complete
 			if (Game.state === State.hand_complete) {
-				// pay winnings, prepare for next hand, etc.
+				// prepare for next hand
 				if (Game.deck.length < Game.deckMin) {
 					Game.deck_reshuffle();
 					Game.message += " Deck shuffled!";
+				}
+				for (var p = 0; p < players.length; p++) {
+					if (!players[p].is_dealer) {
+						// adjust bet size
+						if (players[p].bet > players[p].chip_stack) {
+							players[p].bet = players[p].chip_stack;
+						}
+						// check for game over
+						if (players[p].chip_stack === 0) {
+							Game.message = "Game over!";
+							Game.state = State.game_over
+						}
+					}
 				}
 			}
 		}
@@ -372,6 +427,26 @@
 
 			display_hand(human_player, 300, 75); // player could have a display hand method, if this approach remains
 			display_hand(dealer_player, 300, 700);
+
+			function display_chips(player, x, y) {
+				// Display the chips of a given player at x,y location
+				var bet = player.bet;
+				var chips = player.chip_stack;
+				ctx.fillText("Chips: " + chips, canvas_bounds.left + x, canvas_bounds.bottom - y);
+				ctx.fillText("Bet: " + bet, canvas_bounds.left + x, canvas_bounds.bottom - y + 20);
+				ctx.rect(canvas_bounds.left + x, canvas_bounds.bottom - y + 30,20,20);
+				ctx.fillText("Bet", canvas_bounds.left + x + 30, canvas_bounds.bottom - y + 45);
+				ctx.rect(canvas_bounds.left + x + 75, canvas_bounds.bottom - y + 30,20,20);
+				ctx.moveTo(canvas_bounds.left + x + 5, canvas_bounds.bottom - y + 40);
+				ctx.lineTo(canvas_bounds.left + x + 15, canvas_bounds.bottom - y + 40);
+				ctx.moveTo(canvas_bounds.left + x + 80, canvas_bounds.bottom - y + 40);
+				ctx.lineTo(canvas_bounds.left + x + 90, canvas_bounds.bottom - y + 40);
+				ctx.moveTo(canvas_bounds.left + x + 85, canvas_bounds.bottom - y + 35);
+				ctx.lineTo(canvas_bounds.left + x + 85, canvas_bounds.bottom - y + 45);
+				ctx.stroke;
+			}
+
+			display_chips(human_player, 50, 160);
 
 			// Display message
 			ctx.font = "22px Courier New";
