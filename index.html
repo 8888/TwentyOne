@@ -46,10 +46,15 @@
 
 			class Hand {
 				// Hand of cards
-				constructor() {
+				constructor(split_cards = null, wager = 0) { // cards == array of 2 Card objects from "split"
 					this.cards = [];
 					this.hand_total = 0;
-					this.total_wager = 0;
+					this.total_wager = wager;
+					if (split_cards) {
+						for (var c = 0; c < split_cards.length; c++) {
+							this.cards.push(split_cards[c]);
+						}
+					}
 				}
 
 				receive_card(card) {
@@ -216,6 +221,14 @@
 						this.deck = this.shuffle(this.deck);
 					}
 
+					game.split_hand = function(split_card) {
+						// Creates a new hand from splitting two of the same cards
+						this.deal(this.hand_being_played); // add a new 2nd card to the first hand
+						let dealt_card = this.deck.pop();
+						human_player.chip_stack -= human_player.bet;
+						human_player.hands.push(new Hand([split_card, dealt_card], human_player.bet)); // create the 2nd hand from the split card
+					}
+
 					game.next_hand = function(current_hand = null) {
 						// Moves play to the next hand (if split), player, or the dealer
 						var playable_hands = []; // array of all playable hands. Last hand is dealer
@@ -297,16 +310,40 @@
 			// Click Hit or Stand buttons
 			if (Game.state === State.playing_hand) {
 				// Hit
-				if (mouseX > canvas_bounds.left+550 && mouseX < canvas_bounds.left+550+100) {
+				if (mouseX > canvas_bounds.left+550 && mouseX < canvas_bounds.left+550+50) {
 					if (mouseY > canvas_bounds.bottom-175 && mouseY < canvas_bounds.bottom-175+50) {
 						Game.deal(Game.hand_being_played);
 					}
 				}
 				// Stand
-				if (mouseX > canvas_bounds.left+550 && mouseX < canvas_bounds.left+550+100) {
+				if (mouseX > canvas_bounds.left+550 && mouseX < canvas_bounds.left+550+50) {
 					if (mouseY > canvas_bounds.bottom-100 && mouseY < canvas_bounds.bottom-100+50) {
 						Game.showdown_hands.push(Game.hand_being_played);
 						Game.next_hand(Game.hand_being_played);
+					}
+				}
+
+				// Double
+				if (mouseX > canvas_bounds.left+625 && mouseX < canvas_bounds.left+625+50) {
+					if (mouseY > canvas_bounds.bottom-175 && mouseY < canvas_bounds.bottom-175+50) {
+						if (Game.hand_being_played.cards.length === 2 && human_player.chip_stack >= human_player.bet) {
+							Game.deal(Game.hand_being_played);
+							human_player.place_bet();
+							if (Game.hand_being_played.hand_total < 22) { // Can only draw 1 card on a double
+								Game.showdown_hands.push(Game.hand_being_played);
+								Game.next_hand(Game.hand_being_played);
+							}
+						}
+					}
+				}
+
+				// Split
+				if (mouseX > canvas_bounds.left+625 && mouseX < canvas_bounds.left+625+50) {
+					if (mouseY > canvas_bounds.bottom-100 && mouseY < canvas_bounds.bottom-100+50) {
+						if (Game.hand_being_played.cards.length === 2 && Game.hand_being_played.cards[0].rank === Game.hand_being_played.cards[1].rank && human_player.chip_stack >= human_player.bet) {
+							let split_card = Game.hand_being_played.cards.pop(); // remove the 2nd card
+							Game.split_hand(split_card);
+						}
 					}
 				}
 			}
@@ -354,7 +391,7 @@
 				Game.message = "Your move...";
 				// Check for blackjack
 				if (Game.hand_being_played.cards.length === 2 && Game.dealer_hand.cards.length === 2) {
-					if (Game.hand_being_played.hand_total === 21) {
+					if (Game.hand_being_played.hand_total === 21 && human_player.hands.length === 1) { // no blackjack after split
 						if (Game.dealer_hand.hand_total === 21) {
 							Game.message = "Push";
 							Game.state = State.hand_complete;
@@ -452,15 +489,25 @@
 			ctx.stroke();
 
 			// Hit Button
-			ctx.rect(canvas_bounds.left+550, canvas_bounds.bottom-175,100,50);
-			ctx.fillText("Hit", canvas_bounds.left+575, canvas_bounds.bottom-150);
+			ctx.rect(canvas_bounds.left+550, canvas_bounds.bottom-175,50,50);
+			ctx.font = "14px Courier New";
+			ctx.fillText("Hit", canvas_bounds.left+560, canvas_bounds.bottom-150);
 			ctx.stroke();
 			
 			// Stand Button
-			ctx.rect(canvas_bounds.left+550, canvas_bounds.bottom-100,100,50);
-			ctx.fillText("Stand", canvas_bounds.left+575, canvas_bounds.bottom-75);
+			ctx.rect(canvas_bounds.left+550, canvas_bounds.bottom-100,50,50);
+			ctx.fillText("Stand", canvas_bounds.left+552, canvas_bounds.bottom-75);
 			ctx.stroke();
 
+			// Double Button
+			ctx.rect(canvas_bounds.left+625, canvas_bounds.bottom-175,50,50);
+			ctx.fillText("Double", canvas_bounds.left+626, canvas_bounds.bottom-150);
+			ctx.stroke();
+
+			// Split Button
+			ctx.rect(canvas_bounds.left+625, canvas_bounds.bottom-100,50,50);
+			ctx.fillText("Split", canvas_bounds.left+628, canvas_bounds.bottom-75);
+			ctx.stroke();
 
 			function display_hand(player, x, y) {
 				// Display the hands of a given player at x,y location
@@ -477,14 +524,19 @@
 						hand += player.hands[h].cards[c].rank;
 						hand += " ";
 					}
-					ctx.fillText("Hand: " + hand, canvas_bounds.left + x, canvas_bounds.bottom - y);
+					
+					ctx.fillText("Hand: " + hand, canvas_bounds.left + x + (h*200), canvas_bounds.bottom - y);
 					if (!player.is_dealer || Game.state !== State.playing_hand) {
-						ctx.fillText("Total: " + total, canvas_bounds.left + x, canvas_bounds.bottom - y + 25);
+						ctx.fillText("Total: " + total, canvas_bounds.left + x + (h*200), canvas_bounds.bottom - y + 25);
+					}
+					if (!player.is_dealer) {
+						ctx.fillText("Bet: " + Game.hand_being_played.total_wager, canvas_bounds.left + x + (h*200), canvas_bounds.bottom - y -25);
 					}
 				}
 			}
 
-			display_hand(human_player, 300, 75); // player could have a display hand method, if this approach remains
+			ctx.font = "20px Courier New";
+			display_hand(human_player, 200, 75); // player could have a display hand method, if this approach remains
 			display_hand(dealer_player, 300, 700);
 
 			function display_chips(player, x, y) {
