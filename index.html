@@ -36,6 +36,7 @@
 			}
 
 			class Card {
+				// Individual cards
 				constructor(rank, value, suit) {
 					this.rank = rank;
 					this.value = value;
@@ -43,47 +44,38 @@
 				}
 			}
 
-			class Player {
-				constructor(is_dealer) {
-					this.hand = [];
+			class Hand {
+				// Hand of cards
+				constructor() {
+					this.cards = [];
 					this.hand_total = 0;
-					this.is_dealer = is_dealer;
-					if (!is_dealer) {
-						this.bet = 0;
-						this.chip_stack = 0;
-					}
+					this.total_wager = 0;
 				}
 
 				receive_card(card) {
 					// add a card to the hand
-					this.hand.push(card);
+					this.cards.push(card);
 					this.calculate_total();
-				}
-
-				muck_hand() {
-					// remove all cards from the hand
-					this.hand_total = 0;
-					return this.hand.splice(0, this.hand.length);
 				}
 
 				calculate_total() {
 					// calculates the total hand value
 					var total = 0;
-					var ace_seen = [];
-					if (this.hand.length > 0) {
-						for (var c = 0; c < this.hand.length; c++) {
-							if (this.hand[c].rank === "A") {
-								total += this.hand[c].value[1]; // high
-								ace_seen.push(10);
+					var aces_seen = [];
+					if (this.cards.length > 0) {
+						for (var c = 0; c < this.cards.length; c++) {
+							if (this.cards[c].rank === "A") {
+								total += this.cards[c].value[1]; // high
+								aces_seen.push(10); // amount to adjust ace high to low: 11-1
 							} else {
-								total += this.hand[c].value;
+								total += this.cards[c].value;
 							}
 						}
-						if (total > 21 && ace_seen.length > 0) {
-							for (var a = 0; a < ace_seen.length; a++) {
-								total -= ace_seen[a];
+						if (total > 21 && aces_seen.length > 0) {
+							for (var a = 0; a < aces_seen.length; a++) {
+								total -= aces_seen[a];
 								if (total <= 21) {
-									a = ace_seen.length;
+									a = aces_seen.length;
 								}
 							}
 
@@ -91,6 +83,28 @@
 					}
 					this.hand_total = total;
 				}
+
+				muck_hand() {
+					// remove all cards from the hand
+					this.hand_total = 0;
+					return this.cards.splice(0, this.cards.length);
+				}
+			}
+
+			class Player {
+				constructor(is_dealer) {
+					this.hands = []; // Array of hand objects. There can me multiple hands if player splits
+					this.is_dealer = is_dealer;
+					if (!is_dealer) {
+						this.bet = 0;
+						this.chip_stack = 0;
+					}
+				}
+
+				place_bet() {
+					this.chip_stack -= this.bet;
+					this.hands[0].total_wager += this.bet;
+				}				
 			}
 
 			var game_singleton = (function() {
@@ -100,10 +114,13 @@
 					let game = {
 						// Game parameters
 						state: 0, // current game state
-						deck: null,
+						deck: null, // array of Card objects
 						muck: [], // discard pile
+						hand_being_played: null, // Hand object currently being played
+						dealer_hand: null, // Hand object belonging to the dealer
+						showdown_hands: [], // array of player hand objects that chose "stand"
 						deckMin: 17, // minimum deck array length before reshuffling TODO: randomize this with each new shuffle
-						message: ""
+						message: "" // text to be displayed
 					}
 
 					// Game functions
@@ -158,15 +175,15 @@
 						return shuffled_deck;
 					}
 
-					game.deal = function(player) {
-						// Deals the last card in the deck array to the player
+					game.deal = function(hand) {
+						// Deals the last card in the deck array to the hand
 						let card = this.deck.pop();
-						player.receive_card(card);
+						hand.receive_card(card);
 					}
 
-					game.muck_hands = function(player) {
-						// Moves all of the cards from the player's hands to the muck pile
-						var mucked_hand = player.muck_hand();
+					game.muck_hands = function(hand) {
+						// Moves all of the cards from the hand to the muck pile
+						var mucked_hand = hand.muck_hand();
 							for (var c = 0; c < mucked_hand.length;) {
 								let card = mucked_hand.pop();
 								this.muck.push(card);
@@ -177,9 +194,17 @@
 						// Starts a new hand
 						for (var c = 0; c < 2; c++){ // 2 cards total per player
 							for (var p = 0; p < players.length; p++) { // alternates to each player
-								this.deal(players[p]);
+								if (c === 0) {
+									players[p].hands = []; // reset the hands only on the first itteration
+									players[p].hands.push(new Hand());
+								}
+								this.deal(players[p].hands[0]);
 							}
 						}
+						this.dealer_hand = dealer_player.hands[0]; // reference to dealer hand
+						human_player.place_bet();
+						this.showdown_hands = []; // clear list of hands
+						this.next_hand();
 					}
 
 					game.deck_reshuffle = function() {
@@ -189,6 +214,46 @@
 							this.deck.push(card);
 						}
 						this.deck = this.shuffle(this.deck);
+					}
+
+					game.next_hand = function(current_hand = null) {
+						// Moves play to the next hand (if split), player, or the dealer
+						var playable_hands = []; // array of all playable hands. Last hand is dealer
+						for (var p = 0; p < players.length; p++) {
+							for (var h = 0; h < players[p].hands.length; h++) {
+								playable_hands.push(players[p].hands[h]);
+							}
+						}
+						for (var h = 0; h < playable_hands.length; h++) {
+							if (current_hand === playable_hands[h]) {
+								if (h+1 === playable_hands.length -1) { // If the next hand is the last it's the dealer
+									this.state = State.dealer_playing;
+									return;
+								} else {
+									this.hand_being_played = playable_hands[h+1]; // Move play to the next hand
+									return;
+								}
+							}
+						}
+						// play first hand
+						this.hand_being_played = playable_hands[0];
+					}
+
+					game.showdown = function(dealer_total) {
+						// Compares all hands still in play against the dealer's hand
+						Game.message = "";
+						for (var h = 0; h < this.showdown_hands.length; h++) {
+							if (this.showdown_hands[h].hand_total > dealer_total) {
+								human_player.chip_stack += this.showdown_hands[h].total_wager * 2; // original bet plus 1 to 1 payout.
+								Game.message += "You win! "; // Possibly multiple outcomes TODO: Display improvements
+							} else if (this.showdown_hands[h].hand_total < dealer_total) {
+								Game.message += "You lose! ";
+							} else {
+								human_player.chip_stack += this.showdown_hands[h].total_wager;
+								Game.message += "Push! ";
+							}
+						}
+						Game.state = State.hand_complete;
 					}
 					return game;
 				}
@@ -216,9 +281,11 @@
 			if (Game.state === State.hand_complete) {
 				if (mouseX > canvas_bounds.left+50 && mouseX < canvas_bounds.left+50+100) { // the buttons being clicked should have callable sizes, not hard coded all over the place. Variable? Object?
 					if (mouseY > canvas_bounds.bottom-100 && mouseY < canvas_bounds.bottom-100+50) {
-						for (var p = 0; p < players.length; p ++) { 
-							if (players[p].hand) { // If the player has cards, discard them before dealing a new hand
-								Game.muck_hands(players[p]);
+						for (var p = 0; p < players.length; p ++) {
+							for (var h = 0; h < players[p].hands.length; h++) {
+								if (players[p].hands[h].cards) { // If the player has cards, discard them before dealing a new hand
+									Game.muck_hands(players[p].hands[h]);
+								}
 							}
 						}
 						Game.new_hand(players);
@@ -232,13 +299,14 @@
 				// Hit
 				if (mouseX > canvas_bounds.left+550 && mouseX < canvas_bounds.left+550+100) {
 					if (mouseY > canvas_bounds.bottom-175 && mouseY < canvas_bounds.bottom-175+50) {
-						Game.deal(human_player);
+						Game.deal(Game.hand_being_played);
 					}
 				}
 				// Stand
 				if (mouseX > canvas_bounds.left+550 && mouseX < canvas_bounds.left+550+100) {
 					if (mouseY > canvas_bounds.bottom-100 && mouseY < canvas_bounds.bottom-100+50) {
-						Game.state = State.dealer_playing;
+						Game.showdown_hands.push(Game.hand_being_played);
+						Game.next_hand(Game.hand_being_played);
 					}
 				}
 			}
@@ -285,52 +353,41 @@
 			if (Game.state === State.playing_hand) {
 				Game.message = "Your move...";
 				// Check for blackjack
-				if (human_player.hand.length === 2 && dealer_player.hand.length === 2) {
-					if (human_player.hand_total === 21) {
-						if (dealer_player.hand_total === 21) {
+				if (Game.hand_being_played.cards.length === 2 && Game.dealer_hand.cards.length === 2) {
+					if (Game.hand_being_played.hand_total === 21) {
+						if (Game.dealer_hand.hand_total === 21) {
 							Game.message = "Push";
 							Game.state = State.hand_complete;
 						} else {
 							Game.message = "You got a blackjack!";
-							human_player.chip_stack += (human_player.bet / 2) * 3;
+							human_player.chip_stack += Game.hand_being_played.total_wager + (Game.hand_being_played.total_wager / 2) * 3; // Original bet + blackjack pays 3 to 2
 							Game.state = State.hand_complete;
 						}
-					} else if (dealer_player.hand_total === 21) {
+					} else if (Game.dealer_hand.hand_total === 21) {
 						Game.message = "The dealer got a blackjack!";
-						human_player.chip_stack -= human_player.bet;
 						Game.state = State.hand_complete;
 					}
 				}
 				// Check for bust
-				if (human_player.hand_total > 21) {
+				if (Game.hand_being_played.hand_total > 21) {
 					Game.message = "You busted!";
-					human_player.chip_stack -= human_player.bet;
-					Game.state = State.hand_complete;
+					Game.next_hand(Game.hand_being_played);
 				}
 			}
 			// Dealer playing hand
 			if (Game.state === State.dealer_playing) {
-				// Check for bust
-				if (dealer_player.hand_total > 21) {
-					Game.message = "The dealer busted!";
-					human_player.chip_stack += human_player.bet;
-					Game.state = State.hand_complete;
-				} else if (dealer_player.hand_total < 17) {
-					Game.deal(dealer_player);
-				} else {
-					if (human_player.hand_total > dealer_player.hand_total) {
-						Game.message = "You win!";
-						human_player.chip_stack += human_player.bet;
-					} else if (dealer_player.hand_total > human_player.hand_total) {
-						Game.message = "You lose!";
-						human_player.chip_stack -= human_player.bet;
+				if (Game.showdown_hands.length > 0) { // if there are hands to play against
+					if (Game.dealer_hand.hand_total > 21) {
+						Game.showdown(0); // Bust
+					} else if (Game.dealer_hand.hand_total < 17) {
+						Game.deal(Game.dealer_hand); // Dealer stays on soft 17, hits with less
 					} else {
-						Game.message = "push";
+						Game.showdown(Game.dealer_hand.hand_total); // dealer has 17 to 21
 					}
+				} else {
 					Game.state = State.hand_complete;
 				}
 			}
-
 
 			// Hand complete
 			if (Game.state === State.hand_complete) {
@@ -406,22 +463,24 @@
 
 
 			function display_hand(player, x, y) {
-				// Display the hand of a given player at x,y location
-				var hand = "";
-				var total = player.hand_total;
-				if (player.is_dealer && Game.state === State.playing_hand) {
-					var c = 1;
-					hand += "? "
-				} else {
-					var c = 0;
-				}
-				for (c; c < player.hand.length; c++) {
-					hand += player.hand[c].rank;
-					hand += " ";
-				}
-				ctx.fillText("Hand: " + hand, canvas_bounds.left + x, canvas_bounds.bottom - y);
-				if (!player.is_dealer || Game.state !== State.playing_hand) {
-					ctx.fillText("Total: " + total, canvas_bounds.left + x, canvas_bounds.bottom - y + 25);
+				// Display the hands of a given player at x,y location
+				for (var h = 0; h < player.hands.length; h++) {
+					var hand = "";
+					var total = player.hands[h].hand_total;
+					if (player.is_dealer && Game.state === State.playing_hand) {
+						var c = 1;
+						hand += "? "
+					} else {
+						var c = 0;
+					}
+					for (c; c < player.hands[h].cards.length; c++) {
+						hand += player.hands[h].cards[c].rank;
+						hand += " ";
+					}
+					ctx.fillText("Hand: " + hand, canvas_bounds.left + x, canvas_bounds.bottom - y);
+					if (!player.is_dealer || Game.state !== State.playing_hand) {
+						ctx.fillText("Total: " + total, canvas_bounds.left + x, canvas_bounds.bottom - y + 25);
+					}
 				}
 			}
 
