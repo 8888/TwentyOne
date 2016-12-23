@@ -37,10 +37,14 @@
 
 			class Card {
 				// Individual cards
-				constructor(rank, value, suit) {
+				constructor(rank, value, suit, x, y, width, height) {
 					this.rank = rank;
 					this.value = value;
 					this.suit = suit;
+					this.x = x;
+					this.y = y;
+					this.width = width;
+					this.height = height;
 				}
 			}
 
@@ -118,6 +122,8 @@
 				function createInstance() {
 					let game = {
 						// Game parameters
+						card_face_spritesheet: new Image(),
+						card_back_sprite: new Image(),
 						state: 0, // current game state
 						deck: null, // array of Card objects
 						muck: [], // discard pile
@@ -147,14 +153,27 @@
 
 					game.make_deck = function(decks = 1) {
 						// Creates a usable deck of cards, comprised of a user chosen amount of standard 52 card decks
-						var card_ranks = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
-						var card_values = [2,3,4,5,6,7,8,9,10,10,10,10,[1,11]];
-						var card_suits = ["Clubs", "Diamonds", "Hearts", "Spades"];
+						this.card_face_spritesheet.src = "artwork/playingCards.png";
+						this.card_back_sprite.src = "artwork/cardBack.png";
+						var sprite_width = 71;
+						var sprite_height = 97;
+
+						var card_ranks = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+						var card_values = [[1,11],2,3,4,5,6,7,8,9,10,10,10,10];
+						var card_suits = ["Clubs", "Hearts", "Spades", "Diamonds"];
 						var new_deck = [];
 						for (var i = 0; i < decks; i++) { // Number of decks requested
-							for (var r = 0; r < card_ranks.length; r++) { // Each rank of cards
-								for (var s = 0; s < card_suits.length; s++) { // 1 card for each of the four suits
-									new_deck.push(new Card(card_ranks[r], card_values[r], card_suits[s]));
+							for (var s = 0; s < card_suits.length; s++) { // 1 card for each of the four suits
+								for (var r = 0; r < card_ranks.length; r++) { // Each rank of cards
+									new_deck.push(new Card(
+										card_ranks[r],
+										card_values[r],
+										card_suits[s],
+										2 + (r*sprite_width) + (2*r), // spritesheet x
+										1 + (s*sprite_height) + (1*s), // spritesheet y
+										sprite_width, // width of sprite
+										sprite_height // height of sprite
+									));
 								}
 							}
 						}
@@ -457,7 +476,9 @@
 
 			// Draw initial basic interface
 			// ****This will change as the game expands****
+			//spriteX, spriteY, spriteWidth, spriteHeight, canvasX, canvasY, canvasWidth, canvasX
 
+			/*
 			// Draw Table
 			ctx.moveTo(canvas_bounds.left + canvas_width*.1, canvas_bounds.top + canvas_height*.4);
 			ctx.lineTo(canvas_bounds.left + canvas_width*.1, canvas_bounds.top + canvas_height*.2);
@@ -480,6 +501,7 @@
 				}
 			}
 			draw_player_circles(canvas_bounds.left + canvas_width*.5, canvas_bounds.top + canvas_height*.4, canvas_width*.3, canvas_width*.05);
+			*/
 
 			// Deal Button
 			ctx.rect(canvas_bounds.left+50, canvas_bounds.bottom-100,100,50);
@@ -512,22 +534,38 @@
 			function display_hand(player, x, y) {
 				// Display the hands of a given player at x,y location
 				for (var h = 0; h < player.hands.length; h++) {
-					var hand = "";
 					var total = player.hands[h].hand_total;
 					if (player.is_dealer && Game.state === State.playing_hand) {
 						var c = 1;
-						hand += "? "
+						ctx.drawImage(
+							Game.card_back_sprite,
+							0,
+							0,
+							729,
+							1024,
+							canvas_bounds.left + x, // bounds + location + stacking + split
+							canvas_bounds.bottom - y, // bounds - location
+							71,
+							97
+						);
 					} else {
 						var c = 0;
 					}
 					for (c; c < player.hands[h].cards.length; c++) {
-						hand += player.hands[h].cards[c].rank;
-						hand += " ";
+						ctx.drawImage(
+							Game.card_face_spritesheet,
+							player.hands[h].cards[c].x,
+							player.hands[h].cards[c].y,
+							player.hands[h].cards[c].width,
+							player.hands[h].cards[c].height,
+							canvas_bounds.left + x + (15*c) + (200*h), // bounds + location + stacking + split
+							canvas_bounds.bottom - y, // bounds - location
+							player.hands[h].cards[c].width,
+							player.hands[h].cards[c].height
+						);
 					}
-					
-					ctx.fillText("Hand: " + hand, canvas_bounds.left + x + (h*200), canvas_bounds.bottom - y);
 					if (!player.is_dealer || Game.state !== State.playing_hand) {
-						ctx.fillText("Total: " + total, canvas_bounds.left + x + (h*200), canvas_bounds.bottom - y + 25);
+						ctx.fillText("Total: " + total, canvas_bounds.left + x + (h*200), canvas_bounds.bottom - y);
 					}
 					if (!player.is_dealer) {
 						ctx.fillText("Bet: " + Game.hand_being_played.total_wager, canvas_bounds.left + x + (h*200), canvas_bounds.bottom - y -25);
@@ -536,7 +574,7 @@
 			}
 
 			ctx.font = "20px Courier New";
-			display_hand(human_player, 200, 75); // player could have a display hand method, if this approach remains
+			display_hand(human_player, 50, 350); // player could have a display hand method, if this approach remains
 			display_hand(dealer_player, 300, 700);
 
 			function display_chips(player, x, y) {
