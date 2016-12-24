@@ -1,7 +1,7 @@
 <html>
 <head><title>Twenty One</title></head>
-<body bgcolor="#24AF69">
-	<canvas id="canvasElement" width="720" height="720" style="background-color: #F0F8FF;"></canvas>
+<body>
+	<canvas id="canvasElement" width="720" height="720" style="background: url(artwork/felt.jpg); border:4px solid black;"></canvas>
 	<script type="text/javascript">
 		'use strict';
 		var canvas = document.getElementById("canvasElement");
@@ -50,14 +50,15 @@
 
 			class Hand {
 				// Hand of cards
-				constructor(split_cards = null, wager = 0) { // cards == array of 2 Card objects from "split"
+				constructor(split_cards = null) { // cards == array of 2 Card objects from "split"
 					this.cards = [];
 					this.hand_total = 0;
-					this.total_wager = wager;
+					this.total_wager = 0;
 					if (split_cards) {
 						for (var c = 0; c < split_cards.length; c++) {
 							this.cards.push(split_cards[c]);
 						}
+						this.calculate_total();
 					}
 				}
 
@@ -110,9 +111,9 @@
 					}
 				}
 
-				place_bet() {
+				place_bet(hand = 0) { // 0 defaults to first hand in array, additional if split
 					this.chip_stack -= this.bet;
-					this.hands[0].total_wager += this.bet;
+					this.hands[hand].total_wager += this.bet;
 				}				
 			}
 
@@ -244,8 +245,8 @@
 						// Creates a new hand from splitting two of the same cards
 						this.deal(this.hand_being_played); // add a new 2nd card to the first hand
 						let dealt_card = this.deck.pop();
-						human_player.chip_stack -= human_player.bet;
-						human_player.hands.push(new Hand([split_card, dealt_card], human_player.bet)); // create the 2nd hand from the split card
+						human_player.hands.push(new Hand([split_card, dealt_card])); // create the 2nd hand from the split card
+						human_player.place_bet(human_player.hands.length - 1); // last hand, the new one pushed
 					}
 
 					game.next_hand = function(current_hand = null) {
@@ -347,7 +348,9 @@
 					if (mouseY > canvas_bounds.bottom-175 && mouseY < canvas_bounds.bottom-175+50) {
 						if (Game.hand_being_played.cards.length === 2 && human_player.chip_stack >= human_player.bet) {
 							Game.deal(Game.hand_being_played);
-							human_player.place_bet();
+							let hand_index = human_player.hands.indexOf(Game.hand_being_played);
+							human_player.place_bet(hand_index);
+							console.log(human_player.hands);
 							if (Game.hand_being_played.hand_total < 22) { // Can only draw 1 card on a double
 								Game.showdown_hands.push(Game.hand_being_played);
 								Game.next_hand(Game.hand_being_played);
@@ -503,32 +506,70 @@
 			draw_player_circles(canvas_bounds.left + canvas_width*.5, canvas_bounds.top + canvas_height*.4, canvas_width*.3, canvas_width*.05);
 			*/
 
+			// Button backgrounds
+			ctx.fillStyle="#afafaf"; // gray
+			if (Game.state === State.hand_complete) {
+				ctx.fillStyle="#f3ff7a"; // yellow
+			} else {
+				ctx.fillStyle="#afafaf"; // gray
+			}
+			ctx.fillRect(canvas_bounds.left+50, canvas_bounds.bottom-100,100,50); // Deal
+			ctx.fillRect(canvas_bounds.left + 50, canvas_bounds.bottom - 160 + 30,20,20); // bet minus
+			ctx.fillRect(canvas_bounds.left + 50 + 75, canvas_bounds.bottom - 160 + 30,20,20); // bet plus
+
+			if (Game.state === State.playing_hand) {
+				ctx.fillStyle="#f3ff7a"; // yellow
+			} else {
+				ctx.fillStyle="#afafaf"; // gray
+			}
+			ctx.fillRect(canvas_bounds.left+550, canvas_bounds.bottom-175,50,50); // Hit
+			ctx.fillRect(canvas_bounds.left+550, canvas_bounds.bottom-100,50,50); // Stand
+
+			if (Game.state === State.playing_hand && Game.hand_being_played.cards.length === 2 && human_player.chip_stack >= human_player.bet) {
+				ctx.fillStyle="#f3ff7a"; // yellow
+			} else {
+				ctx.fillStyle="#afafaf"; // gray
+			}
+			ctx.fillRect(canvas_bounds.left+625, canvas_bounds.bottom-175,50,50); // Double
+
+			if (
+				Game.state === State.playing_hand
+				&& Game.hand_being_played.cards.length === 2 
+				&& Game.hand_being_played.cards[0].rank === Game.hand_being_played.cards[1].rank 
+				&& human_player.chip_stack >= human_player.bet
+			) {
+				ctx.fillStyle="#f3ff7a"; // yellow
+			} else {
+				ctx.fillStyle="#afafaf"; // gray
+			}
+			ctx.fillRect(canvas_bounds.left+625, canvas_bounds.bottom-100,50,50); // Split
+			
 			// Deal Button
 			ctx.rect(canvas_bounds.left+50, canvas_bounds.bottom-100,100,50);
 			ctx.font = "20px Courier New";
             ctx.strokeStyle = "black";
-			ctx.fillText("Deal", canvas_bounds.left+75, canvas_bounds.bottom-75);
+			ctx.strokeText("Deal", canvas_bounds.left+75, canvas_bounds.bottom-75);
 			ctx.stroke();
 
 			// Hit Button
 			ctx.rect(canvas_bounds.left+550, canvas_bounds.bottom-175,50,50);
 			ctx.font = "14px Courier New";
-			ctx.fillText("Hit", canvas_bounds.left+560, canvas_bounds.bottom-150);
+			ctx.strokeText("Hit", canvas_bounds.left+560, canvas_bounds.bottom-150);
 			ctx.stroke();
 			
 			// Stand Button
 			ctx.rect(canvas_bounds.left+550, canvas_bounds.bottom-100,50,50);
-			ctx.fillText("Stand", canvas_bounds.left+552, canvas_bounds.bottom-75);
+			ctx.strokeText("Stand", canvas_bounds.left+552, canvas_bounds.bottom-75);
 			ctx.stroke();
 
 			// Double Button
 			ctx.rect(canvas_bounds.left+625, canvas_bounds.bottom-175,50,50);
-			ctx.fillText("Double", canvas_bounds.left+626, canvas_bounds.bottom-150);
+			ctx.strokeText("Double", canvas_bounds.left+626, canvas_bounds.bottom-150);
 			ctx.stroke();
 
 			// Split Button
 			ctx.rect(canvas_bounds.left+625, canvas_bounds.bottom-100,50,50);
-			ctx.fillText("Split", canvas_bounds.left+628, canvas_bounds.bottom-75);
+			ctx.strokeText("Split", canvas_bounds.left+628, canvas_bounds.bottom-75);
 			ctx.stroke();
 
 			function display_hand(player, x, y) {
@@ -564,11 +605,11 @@
 							player.hands[h].cards[c].height
 						);
 					}
-					if (!player.is_dealer || Game.state !== State.playing_hand) {
-						ctx.fillText("Total: " + total, canvas_bounds.left + x + (h*200), canvas_bounds.bottom - y);
+					if (!player.is_dealer || Game.state != State.playing_hand) {
+						ctx.strokeText("Total: " + total, canvas_bounds.left + x + (h*200), canvas_bounds.bottom - y);
 					}
 					if (!player.is_dealer) {
-						ctx.fillText("Bet: " + Game.hand_being_played.total_wager, canvas_bounds.left + x + (h*200), canvas_bounds.bottom - y -25);
+						ctx.strokeText("Bet: " + Game.hand_being_played.total_wager, canvas_bounds.left + x + (h*200), canvas_bounds.bottom - y -25);
 					}
 				}
 			}
@@ -581,10 +622,10 @@
 				// Display the chips of a given player at x,y location
 				var bet = player.bet;
 				var chips = player.chip_stack;
-				ctx.fillText("Chips: " + chips, canvas_bounds.left + x, canvas_bounds.bottom - y);
-				ctx.fillText("Bet: " + bet, canvas_bounds.left + x, canvas_bounds.bottom - y + 20);
+				ctx.strokeText("Chips: " + chips, canvas_bounds.left + x, canvas_bounds.bottom - y);
+				ctx.strokeText("Bet: " + bet, canvas_bounds.left + x, canvas_bounds.bottom - y + 20);
 				ctx.rect(canvas_bounds.left + x, canvas_bounds.bottom - y + 30,20,20);
-				ctx.fillText("Bet", canvas_bounds.left + x + 30, canvas_bounds.bottom - y + 45);
+				ctx.strokeText("Bet", canvas_bounds.left + x + 30, canvas_bounds.bottom - y + 45);
 				ctx.rect(canvas_bounds.left + x + 75, canvas_bounds.bottom - y + 30,20,20);
 				ctx.moveTo(canvas_bounds.left + x + 5, canvas_bounds.bottom - y + 40);
 				ctx.lineTo(canvas_bounds.left + x + 15, canvas_bounds.bottom - y + 40);
@@ -594,13 +635,12 @@
 				ctx.lineTo(canvas_bounds.left + x + 85, canvas_bounds.bottom - y + 45);
 				ctx.stroke;
 			}
-
 			display_chips(human_player, 50, 160);
 
 			// Display message
 			ctx.font = "22px Courier New";
             ctx.strokeStyle = "black";
-			ctx.fillText(Game.message, canvas_bounds.left+250, canvas_bounds.bottom-500);
+			ctx.strokeText(Game.message, canvas_bounds.left+250, canvas_bounds.bottom-500);
 			ctx.stroke();
 		}
 
