@@ -474,40 +474,8 @@
 		// Draw the elements to the canvas
 		function display() {
 			ctx.clearRect(0, 0, canvas_width, canvas_height);
-            ctx.font = "14px Courier New";
-            ctx.strokeStyle = "black";
-
-			// Draw initial basic interface
-			// ****This will change as the game expands****
-			//spriteX, spriteY, spriteWidth, spriteHeight, canvasX, canvasY, canvasWidth, canvasX
-
-			/*
-			// Draw Table
-			ctx.moveTo(canvas_bounds.left + canvas_width*.1, canvas_bounds.top + canvas_height*.4);
-			ctx.lineTo(canvas_bounds.left + canvas_width*.1, canvas_bounds.top + canvas_height*.2);
-			ctx.lineTo(canvas_bounds.left + canvas_width*.9, canvas_bounds.top + canvas_height*.2);
-			ctx.lineTo(canvas_bounds.left + canvas_width*.9, canvas_bounds.top + canvas_height*.4);
-			ctx.stroke();
-			ctx.beginPath();
-			ctx.arc(canvas_bounds.left + canvas_width*.5, canvas_bounds.top + canvas_height*.4, canvas_width*.4, 0, Math.PI);
-			ctx.stroke();
-
-			// Draw player circles
-			function draw_player_circles(centerX, centerY, radius, size) {
-				var angle = (2 * Math.PI) / 12; // Angle in radians
-				for (var c = 1; c < 6; c++) {
-					var x = centerX + radius * Math.cos(angle * c);
-					var y = centerY + radius * Math.sin(angle * c);
-					ctx.beginPath();
-					ctx.arc(x, y, size, 0, 2*Math.PI);
-					ctx.stroke();	
-				}
-			}
-			draw_player_circles(canvas_bounds.left + canvas_width*.5, canvas_bounds.top + canvas_height*.4, canvas_width*.3, canvas_width*.05);
-			*/
-
+			
 			// Button backgrounds
-			ctx.fillStyle="#afafaf"; // gray
 			if (Game.state === State.hand_complete) {
 				ctx.fillStyle="#f3ff7a"; // yellow
 			} else {
@@ -525,7 +493,11 @@
 			ctx.fillRect(canvas_bounds.left+550, canvas_bounds.bottom-175,50,50); // Hit
 			ctx.fillRect(canvas_bounds.left+550, canvas_bounds.bottom-100,50,50); // Stand
 
-			if (Game.state === State.playing_hand && Game.hand_being_played.cards.length === 2 && human_player.chip_stack >= human_player.bet) {
+			if (
+				Game.state === State.playing_hand 
+				&& Game.hand_being_played.cards.length === 2 
+				&& human_player.chip_stack >= human_player.bet
+			) {
 				ctx.fillStyle="#f3ff7a"; // yellow
 			} else {
 				ctx.fillStyle="#afafaf"; // gray
@@ -544,40 +516,34 @@
 			}
 			ctx.fillRect(canvas_bounds.left+625, canvas_bounds.bottom-100,50,50); // Split
 			
-			// Deal Button
+			// Draw gameplay buttons
+			// Deal
 			ctx.rect(canvas_bounds.left+50, canvas_bounds.bottom-100,100,50);
 			ctx.font = "20px Courier New";
             ctx.strokeStyle = "black";
 			ctx.strokeText("Deal", canvas_bounds.left+75, canvas_bounds.bottom-75);
-			ctx.stroke();
-
-			// Hit Button
+			// Hit
 			ctx.rect(canvas_bounds.left+550, canvas_bounds.bottom-175,50,50);
 			ctx.font = "14px Courier New";
 			ctx.strokeText("Hit", canvas_bounds.left+560, canvas_bounds.bottom-150);
-			ctx.stroke();
-			
-			// Stand Button
+			// Stand
 			ctx.rect(canvas_bounds.left+550, canvas_bounds.bottom-100,50,50);
 			ctx.strokeText("Stand", canvas_bounds.left+552, canvas_bounds.bottom-75);
-			ctx.stroke();
-
-			// Double Button
+			// Double
 			ctx.rect(canvas_bounds.left+625, canvas_bounds.bottom-175,50,50);
 			ctx.strokeText("Double", canvas_bounds.left+626, canvas_bounds.bottom-150);
-			ctx.stroke();
-
-			// Split Button
+			// Split
 			ctx.rect(canvas_bounds.left+625, canvas_bounds.bottom-100,50,50);
 			ctx.strokeText("Split", canvas_bounds.left+628, canvas_bounds.bottom-75);
-			ctx.stroke();
 
+			// Draw hands
 			function display_hand(player, x, y) {
 				// Display the hands of a given player at x,y location
 				for (var h = 0; h < player.hands.length; h++) {
 					var total = player.hands[h].hand_total;
 					if (player.is_dealer && Game.state === State.playing_hand) {
 						var c = 1;
+						//spriteX, spriteY, spriteWidth, spriteHeight, canvasX, canvasY, canvasWidth, canvasX
 						ctx.drawImage(
 							Game.card_back_sprite,
 							0,
@@ -606,14 +572,13 @@
 						);
 					}
 					if (!player.is_dealer || Game.state != State.playing_hand) {
-						ctx.strokeText("Total: " + total, canvas_bounds.left + x + (h*200), canvas_bounds.bottom - y);
+						ctx.strokeText("Total: " + total, canvas_bounds.left + x + (h*200), canvas_bounds.bottom - y-5);
 					}
 					if (!player.is_dealer) {
 						ctx.strokeText("Bet: " + Game.hand_being_played.total_wager, canvas_bounds.left + x + (h*200), canvas_bounds.bottom - y -25);
 					}
 				}
 			}
-
 			ctx.font = "20px Courier New";
 			display_hand(human_player, 50, 350); // player could have a display hand method, if this approach remains
 			display_hand(dealer_player, 300, 700);
@@ -633,7 +598,6 @@
 				ctx.lineTo(canvas_bounds.left + x + 90, canvas_bounds.bottom - y + 40);
 				ctx.moveTo(canvas_bounds.left + x + 85, canvas_bounds.bottom - y + 35);
 				ctx.lineTo(canvas_bounds.left + x + 85, canvas_bounds.bottom - y + 45);
-				ctx.stroke;
 			}
 			display_chips(human_player, 50, 160);
 
@@ -641,6 +605,7 @@
 			ctx.font = "22px Courier New";
             ctx.strokeStyle = "black";
 			ctx.strokeText(Game.message, canvas_bounds.left+250, canvas_bounds.bottom-500);
+			
 			ctx.stroke();
 		}
 
