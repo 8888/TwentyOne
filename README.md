@@ -1,5 +1,7 @@
 # TwentyOne
-A single player blackjack game!
+An in-broswer blackjack game!<br>
+https://betterin30days.github.io/TwentyOne/<br>
+<img src="https://github.com/betterin30days/TwentyOne/blob/master/screenshots/21.gif"><br>
 
 # Features
 -Play is against the dealer, following standard casino rules<br>
